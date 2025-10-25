@@ -19,15 +19,16 @@ returns void
 language plpgsql as
 $$
 begin
-	perform pg_terminate_backend(procpid) from pg_stat_activity
+	perform pg_terminate_backend(procpid)
+	from pg_stat_activity
 	where waiting=false
-	and current_query in ('<IDLE>','<IDLE> in transaction')
+	and current_query='<IDLE> in transaction'
 	and (current_timestamp-query_start) >= duration;
 end;
 $$;
 
 comment on function kill_idle(interval) is
-'Terminates backends with idle sessions greater than or equal to "duration".
+'Terminates "idle in transaction" backends whose session time is greater than or equal to "duration".
 Parameters:
 	duration - threshold for idle session time (default 15 minutes)
 ';
@@ -82,10 +83,11 @@ comment on column all_casts."method" is 'It is pg_cast.castmethod attribute';
 
 -- Schema size
 
-create view schema_size(name,size) as
-select s.nspname,sum(pg_relation_size(c.oid))
+create or replace view schema_size(name,size) as
+select s.nspname,sum(pg_total_relation_size(c.oid))
 from pg_class c
 join pg_namespace s on (c.relnamespace=s.oid)
+where c.relkind='r'
 group by s.nspname;
 
 comment on view schema_size is 'Lists the total size of schemas. It considers all objects in the schema.';

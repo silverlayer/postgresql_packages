@@ -1,4 +1,4 @@
-# Management Module - pgmana v0.1.0
+# Management Module - pgmana v0.2.0
 
 This module's aim is to streamline administrative tasks commonly performed by DBAs in **PostgreSQL v8.4.x**.
 It requires **plpgsql** to work correctly.
@@ -12,7 +12,7 @@ Make sure the **plpgsql** is activated in the target database, and then execute 
 
 `kill_idle(duration interval)` &rarr; `void`
 
-Terminates backends with idle sessions greater than or equal to **duration**. Only superusers can execute it.
+Terminates *idle in transaction* backends whose session time is greater than or equal to **duration**. Only superusers can execute it.
 
 **Parameters:**
 - duration - threshold for idle session time (default 15 minutes)
@@ -45,7 +45,7 @@ See the meaning of attributes at pg_cast documentation https://www.postgresql.or
 
 `schema_size`
 
-Lists the total size of schemas. It considers all objects in the schema.
+Lists the total size of schemas. It considers all objects in the schema, except **large objects**.
 
 **Attributes:**
 - name - schema's name
