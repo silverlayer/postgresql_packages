@@ -1,4 +1,4 @@
-# Management Module - pgmana v0.2.0
+# Management Module - pgmana v0.3.0
 
 This module's aim is to streamline administrative tasks commonly performed by DBAs in **PostgreSQL v8.4.x**.
 It requires **plpgsql** to work correctly.
