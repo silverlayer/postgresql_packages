@@ -13,3 +13,6 @@ drop function if exists get_mvidx_stmt(text);
 drop view if exists ownership_rectification_stmt;
 drop view if exists all_casts;
 drop view if exists schema_size;
+drop view if exists db_objects;
+drop view if exists repeated_indexes;
+drop view if exists unused_indexes;

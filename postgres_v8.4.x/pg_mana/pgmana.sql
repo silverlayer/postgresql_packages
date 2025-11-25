@@ -75,10 +75,13 @@ left join pg_namespace n on p.pronamespace=n.oid;
 
 comment on view all_casts is
 'Lists all casts in the database and its corresponding functions if any.
-See the meaning of attributes at pg_cast documentation (https://www.postgresql.org/docs/8.4/catalog-pg-cast.html)';
+See the meaning of attributes at pg_cast documentation (https://www.postgresql.org/docs/8.4/catalog-pg-cast.html)
 
-comment on column all_casts.context is 'It is pg_cast.castcontext attribute';
-comment on column all_casts."method" is 'It is pg_cast.castmethod attribute';
+This view is part of pg_mana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
+
+comment on column all_casts.context is 'pg_cast.castcontext attribute';
+comment on column all_casts."method" is 'pg_cast.castmethod attribute';
 
 
 -- Schema size
@@ -90,7 +93,11 @@ join pg_namespace s on (c.relnamespace=s.oid)
 where c.relkind='r'
 group by s.nspname;
 
-comment on view schema_size is 'Lists the total size of schemas. It considers all objects in the schema.';
+comment on view schema_size is
+'Lists the total size of schemas. It considers all objects in the schema.
+
+This view is part of pg_mana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 comment on column schema_size.name is 'schema name';
 comment on column schema_size.size is 'size of schema (bytes)';
 
@@ -152,4 +159,72 @@ where n.nspname not in ('information_schema','public')
 and n.nspname not like 'pg_%' and n.nspowner!=a.oid;
 
 comment on view ownership_rectification_stmt is
-'Generates statements to correct ownership of objects for environments wherein each user has its own schema with the same name (user-specific schema)';
+'Generates statements to correct ownership of objects for environments wherein each user has its own schema with the same name (user-specific schema)
+
+This view is part of pg_mana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
+
+
+create or replace view db_objects("oid","name","type","size","tablespace","tablespace_loc","relfilenode") as
+select c.oid,n.nspname||'.'||c.relname,
+case c.relkind
+	when 'r' then 'table'
+	when 'i' then 'index'
+	when 'S' then 'sequence'
+	when 'v' then 'view'
+	when 'c' then 'composite type'
+	when 't' then 'toast table'
+	else 'unknown'
+end,
+pg_relation_size(c.oid),
+ts.spcname,ts.spclocation,c.relfilenode
+from pg_catalog.pg_class c
+join pg_catalog.pg_namespace n on (c.relnamespace=n.oid)
+join (
+	select spcname,spclocation,
+	case
+		when oid=(select dattablespace from pg_catalog.pg_database where datname = current_database()) then 0
+		else oid
+	end as "oid"
+	from pg_catalog.pg_tablespace
+) ts on (c.reltablespace=ts.oid);
+
+comment on view db_objects is
+'Lists all objects (or relations) in the current database and their characteristics
+
+This view is part of pg_mana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
+comment on column db_objects.tablespace_loc is 'file system path of the tablespace';
+comment on column db_objects.size is 'object size (in bytes)';
+
+
+create or replace view repeated_indexes("indexes_names","table_name","columns_id","rep_amount") as
+select array_agg(indexrelid::regclass::name),indrelid::regclass::name,indkey,count(1)
+from pg_index
+where indisvalid
+group by indrelid, indisunique,indisprimary,indkey
+having count(1)>1;
+
+comment on view repeated_indexes is
+'Lists all repeated indexes in the current database
+
+This view is part of pg_mana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
+comment on column repeated_indexes.indexes_names is 'the names of repeated indexes (as array)';
+comment on column repeated_indexes.columns_id is 'columns identities used by the indexes';
+comment on column repeated_indexes.rep_amount is 'amount of repetitions';
+
+
+create or replace view unused_indexes("table_name","index_name","index_size") as
+select schemaname||'.'||relname, indexrelname,pg_relation_size(indexrelid)
+from pg_stat_user_indexes
+join pg_index using (indexrelid)
+where idx_scan<1
+and indisvalid and not (indisprimary or indisunique);
+
+comment on view unused_indexes is
+'Lists all unused indexes in the current database
+
+This view is part of pg_mana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
+comment on column unused_indexes.index_size is '(in bytes)';
