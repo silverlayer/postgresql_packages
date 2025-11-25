@@ -1,4 +1,4 @@
-# Management Module - pgmana v0.2.0
+# Management Module - pgmana v0.3.0
 
 This module's aim is to streamline administrative tasks commonly performed by DBAs in **PostgreSQL v8.4.x**.
 It requires **plpgsql** to work correctly.
@@ -59,3 +59,41 @@ Generates statements to correct ownership of objects for environments wherein ea
 
 **Attributes:**
 - statement - command to change the ownership
+
+&nbsp;
+
+`db_objects`
+
+Lists all objects (or relations) in the current database and their characteristics
+
+**Attributes**
+- oid - object's identity
+- name - object's name
+- type - object's type
+- size - object's size (in bytes)
+- tablespace - object's tablespace
+- tablespace_loc - file system path of the tablespace
+- relfilenode - file node identity of object
+
+&nbsp;
+
+`repeated_indexes`
+
+Lists all repeated indexes in the current database. The index must be valid.
+
+**Attributes**
+- indexes_names - names of repeated indexes (as array)
+- table_name - table's name
+- columns_id - columns identities used by the indexes
+- rep_amount - amount of repetitions
+
+&nbsp;
+
+`unused_indexes`
+
+Lists all unused indexes in the current database. It disregards primary, unique or invalid indexes.
+
+**Attributes**
+- table_name - table's name
+- index_name - index's name
+- index_size - index's size (in bytes)
