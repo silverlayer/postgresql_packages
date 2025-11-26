@@ -200,7 +200,7 @@ comment on column db_objects.size is 'object size (in bytes)';
 
 create or replace view repeated_indexes("indexes_names","table_name","columns_id","index_size","rep_amount") as
 select array_agg(i.indexrelid::regclass::name),i.indrelid::regclass::name,i.indkey,
-pg_relation_size((array_agg(i.indexrelid))[1]),count(1)
+pg_relation_size(max(i.indexrelid)),count(1)
 from pg_catalog.pg_index i
 join pg_catalog.pg_class c on (i.indexrelid=c.oid)
 where i.indisvalid
