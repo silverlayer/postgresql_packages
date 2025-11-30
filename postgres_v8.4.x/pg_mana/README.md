@@ -1,4 +1,4 @@
-# Management Module - pgmana v0.3.0
+# Management Module - pgmana v0.4.0
 
 This module's aim is to streamline administrative tasks commonly performed by DBAs in **PostgreSQL v8.4.x**.
 It requires **plpgsql** to work correctly.
@@ -85,6 +85,7 @@ Lists all repeated indexes in the current database. The index must be valid.
 - indexes_names - names of repeated indexes (as array)
 - table_name - table's name
 - columns_id - columns identities used by the indexes
+- index_size - index's size (in bytes)
 - rep_amount - amount of repetitions
 
 &nbsp;

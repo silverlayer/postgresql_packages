@@ -77,7 +77,7 @@ comment on view all_casts is
 'Lists all casts in the database and its corresponding functions if any.
 See the meaning of attributes at pg_cast documentation (https://www.postgresql.org/docs/8.4/catalog-pg-cast.html)
 
-This view is part of pg_mana module
+This view is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 
 comment on column all_casts.context is 'pg_cast.castcontext attribute';
@@ -96,7 +96,7 @@ group by s.nspname;
 comment on view schema_size is
 'Lists the total size of schemas. It considers all objects in the schema.
 
-This view is part of pg_mana module
+This view is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 comment on column schema_size.name is 'schema name';
 comment on column schema_size.size is 'size of schema (bytes)';
@@ -161,7 +161,7 @@ and n.nspname not like 'pg_%' and n.nspowner!=a.oid;
 comment on view ownership_rectification_stmt is
 'Generates statements to correct ownership of objects for environments wherein each user has its own schema with the same name (user-specific schema)
 
-This view is part of pg_mana module
+This view is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 
 
@@ -192,26 +192,29 @@ join (
 comment on view db_objects is
 'Lists all objects (or relations) in the current database and their characteristics
 
-This view is part of pg_mana module
+This view is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 comment on column db_objects.tablespace_loc is 'file system path of the tablespace';
 comment on column db_objects.size is 'object size (in bytes)';
 
 
-create or replace view repeated_indexes("indexes_names","table_name","columns_id","rep_amount") as
-select array_agg(indexrelid::regclass::name),indrelid::regclass::name,indkey,count(1)
-from pg_index
-where indisvalid
-group by indrelid, indisunique,indisprimary,indkey
+create or replace view repeated_indexes("indexes_names","table_name","columns_id","index_size","rep_amount") as
+select array_agg(i.indexrelid::regclass::name),i.indrelid::regclass::name,i.indkey,
+pg_relation_size(max(i.indexrelid)),count(1)
+from pg_catalog.pg_index i
+join pg_catalog.pg_class c on (i.indexrelid=c.oid)
+where i.indisvalid
+group by i.indrelid,i.indkey,i.indoption,c.relam
 having count(1)>1;
 
 comment on view repeated_indexes is
 'Lists all repeated indexes in the current database
 
-This view is part of pg_mana module
+This view is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 comment on column repeated_indexes.indexes_names is 'the names of repeated indexes (as array)';
 comment on column repeated_indexes.columns_id is 'columns identities used by the indexes';
+comment on column repeated_indexes.index_size is '(in bytes)';
 comment on column repeated_indexes.rep_amount is 'amount of repetitions';
 
 
@@ -225,6 +228,6 @@ and indisvalid and not (indisprimary or indisunique);
 comment on view unused_indexes is
 'Lists all unused indexes in the current database
 
-This view is part of pg_mana module
+This view is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 comment on column unused_indexes.index_size is '(in bytes)';
