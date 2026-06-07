@@ -16,3 +16,5 @@ drop view if exists schema_size;
 drop view if exists db_objects;
 drop view if exists repeated_indexes;
 drop view if exists unused_indexes;
+drop view if exists largeobject_owner;
+drop view if exists all_operators;
