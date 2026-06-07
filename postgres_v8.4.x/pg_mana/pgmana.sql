@@ -23,7 +23,7 @@ begin
 	from pg_stat_activity
 	where waiting=false
 	and current_query='<IDLE> in transaction'
-	and (current_timestamp-query_start) >= duration;
+	and (clock_timestamp()-query_start) >= duration;
 end;
 $$;
 
@@ -31,7 +31,9 @@ comment on function kill_idle(interval) is
 'Terminates "idle in transaction" backends whose session time is greater than or equal to "duration".
 Parameters:
 	duration - threshold for idle session time (default 15 minutes)
-';
+
+This function is part of pgmana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 
 revoke all on function kill_idle(interval) from public;
 
@@ -58,20 +60,29 @@ $$;
 comment on function get_mvidx_stmt(text) is 
 'Returns statements to move indexes from the default tablespace to the specified tablespace.
 Parameters:
-	dst_tbs - target tablespace';
+	dst_tbs - target tablespace
+
+This function is part of pgmana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 
 
 -- VIEWS SECTION
 
 -- casts
-create or replace view all_casts(source_type,target_type,context,"method","function") as
-select src.typname,tgt.typname,castcontext,castmethod,
-n.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')'
-from pg_cast
-join pg_type src on pg_cast.castsource=src.oid
-join pg_type tgt on pg_cast.casttarget=tgt.oid
-left join pg_proc p on pg_cast.castfunc=p.oid
-left join pg_namespace n on p.pronamespace=n.oid;
+create or replace view all_casts(oid,source_type,target_type,context,"method","function") as
+select oid, castsource::regtype, casttarget::regtype,
+case castcontext
+	when 'e' then 'explicit'
+	when 'i' then 'implicit in assignment'
+	else 'implicit in expression'
+end,
+case castmethod
+	when 'f' then 'function'
+	when 'i' then 'I/O function'
+	else 'no conversion'
+end,
+castfunc::regprocedure
+from pg_cast;
 
 comment on view all_casts is
 'Lists all casts in the database and its corresponding functions if any.
@@ -80,9 +91,28 @@ See the meaning of attributes at pg_cast documentation (https://www.postgresql.o
 This view is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 
-comment on column all_casts.context is 'pg_cast.castcontext attribute';
-comment on column all_casts."method" is 'pg_cast.castmethod attribute';
 
+-- operators
+create or replace view all_operators("oid","kind","operator","commutator","negator","left_type","right_type","result_type","function","restriction_function","join_function","is_mergeable","is_hashable","owner") as
+select o.oid,
+case o.oprkind
+	when 'b' then 'infix'
+	when 'l' then 'prefix'
+	when 'r' then 'postfix'
+	else 'unknown'
+end,
+o.oid::regoper, o.oprcom::regoper, o.oprnegate::regoper, o.oprleft::regtype, o.oprright::regtype,
+o.oprresult::regtype, o.oprcode::regprocedure, o.oprrest::regprocedure, o.oprjoin::regprocedure,
+o.oprcanmerge, o.oprcanhash, a.rolname
+from pg_operator o
+join pg_authid a on (o.oprowner=a.oid);
+
+comment on view all_operators is
+'Lists all operators in the database.
+See the meaning of attributes at pg_operator documentation (https://www.postgresql.org/docs/8.4/catalog-pg-operator.html)
+
+This view is part of pgmana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 
 -- Schema size
 
@@ -231,3 +261,20 @@ comment on view unused_indexes is
 This view is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 comment on column unused_indexes.index_size is '(in bytes)';
+
+
+create or replace view largeobject_owner("schema","table_oid","table","column") as
+select n.nspname, c.oid, c.relname, a.attname
+from pg_class c
+join pg_attribute a on (a.attrelid=c.oid)
+join pg_namespace n on (n.oid=c.relnamespace)
+where n.nspname not in ('pg_catalog','information_schema')
+and c.relkind='r'
+and a.atttypid='oid'::regtype
+and a.attnum>0; -- exclude system columns
+
+comment on view largeobject_owner is
+'Lists all user-space columns that likely hold a reference to large objects
+
+This view is part of pgmana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';

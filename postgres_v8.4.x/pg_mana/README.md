@@ -1,4 +1,4 @@
-# Management Module - pgmana v0.4.0
+# Management Module - pgmana v0.5.0
 
 This module's aim is to streamline administrative tasks commonly performed by DBAs in **PostgreSQL v8.4.x**.
 It requires **plpgsql** to work correctly.
@@ -32,14 +32,38 @@ Returns statements to move indexes from the default tablespace to the specified 
 `all_casts`
 
 Lists all casts in the database and its corresponding functions if any.
-See the meaning of attributes at pg_cast documentation https://www.postgresql.org/docs/8.4/catalog-pg-cast.html
+See the meaning of attributes at [pg_cast](https://www.postgresql.org/docs/8.4/catalog-pg-cast.html) documentation
 
 **Attributes:**
+- oid - the cast identification
 - source_type - the type in the source of cast
 - target_type - the type in the target of cast
 - context - it is pg_cast.castcontext attribute
 - method - it is pg_cast.castmethod attribute
 - function - the function utilized for casting if any
+
+&nbsp;
+
+`all_operators`
+
+Lists all operators in the database.
+See the meaning of attributes at [pg_operator](https://www.postgresql.org/docs/8.4/catalog-pg-operator.html) documentation
+
+**Attributes:**
+- oid - the operator identification
+- kind - it's based on pg_operator.oprkind attribute
+- operator - the operator name
+- commutator - name of commutator operator
+- negator - name of negator operator
+- left_type - the left operand type if any
+- right_type - the right operand type if any
+- result_type - it's based on pg_operator.oprresult attribute
+- function - the function that compares the operands
+- restriction_function - it's based on pg_operator.oprrest attribute
+- join_function - it's based on pg_operator.oprjoin attribute
+- is_mergeable - is the operator mergeable?
+- is_hashable - is the operator hashable?
+- owner - the operator's owner
 
 &nbsp;
 
@@ -98,3 +122,15 @@ Lists all unused indexes in the current database. It disregards primary, unique 
 - table_name - table's name
 - index_name - index's name
 - index_size - index's size (in bytes)
+
+&nbsp;
+
+`largeobject_owner`
+
+Lists all user-space columns that likely hold a reference to large objects.
+
+**Attributes**
+- schema - the schema name
+- table_oid - table identification
+- table - table name
+- column - column name
