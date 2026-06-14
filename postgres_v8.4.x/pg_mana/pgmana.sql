@@ -73,7 +73,7 @@ create or replace view all_casts(oid,source_type,target_type,context,"method","f
 select oid, castsource::regtype, casttarget::regtype,
 case castcontext
 	when 'e' then 'explicit'
-	when 'i' then 'implicit in assignment'
+	when 'a' then 'implicit in assignment'
 	else 'implicit in expression'
 end,
 case castmethod
