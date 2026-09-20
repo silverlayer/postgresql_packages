@@ -2,7 +2,7 @@
  * Setup for database maintenance module (pgmaint).
  * You must run this script with a superuser account.
  * 
- * Authors: Kelvin S. Amorim <developers@silverlayer.space>
+ * Authors: Kelvin S. Amorim <kelvin.amorim@proton.me>
  * Designed for: PostgreSQL 8.4.x
  * Dependencies: pgstattuple module and plpgsql
  * License: BSD 3-Clause

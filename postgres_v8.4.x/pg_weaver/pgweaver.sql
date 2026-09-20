@@ -2,82 +2,73 @@
  * Setup for pg_weaver module
  * You must run this script with a superuser account.
  * 
- * Authors: Kelvin S. Amorim <developers@silverlayer.space>
+ * Authors: Kelvin S. Amorim <kelvin.amorim@proton.me>
  * Designed for: PostgreSQL 8.4.x
  * Dependencies: plpgsql
  * License: BSD 3-Clause
  * Official repository: https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_weaver
  */
 
-
 set search_path to public;
 
-create or replace view dependency(schema_dependent, schema_dependency) as
-select tg.grantee,tg.table_schema
-from information_schema.role_table_grants tg
-where tg.grantee!='postgres'
-and tg.grantee!=tg.table_schema
-and exists(select true from pg_namespace where nspname=tg.grantee)
-union -- dependency on functions
-select rg.grantee,rg.routine_schema
-from information_schema.role_routine_grants rg
-where rg.grantee!='postgres'
-and rg.grantee!=rg.routine_schema
-and exists(select true from pg_namespace where nspname=rg.grantee)
-union -- views dependencies
-select view_schema,table_schema
-from information_schema.view_table_usage
-where view_schema not like 'pg_%'
-and view_schema!='information_schema'
-and view_schema!=table_schema;
-
-comment on view dependency is 'Lists all inter-schema dependencies';
-
-revoke all on dependency from public;
-
-
-create or replace function cache_dependency(force_reload boolean default false)
+create or replace function reload_cache(forced boolean default false)
 returns void
 language plpgsql as
 $$
 begin
 
-	if force_reload then
-		drop table if exists dependency_cache;
-
-		create temp table dependency_cache as
-		select schema_dependent::text,schema_dependency::text
-		from dependency
-		order by schema_dependent,schema_dependency;
-
-		return;
+	if forced then
+		drop table if exists pgweaver_cache;
 	end if;
 
 	begin
-		if exists(select 1 from dependency_cache limit 1) then
+		if exists(select 1 from pgweaver_cache limit 1) then
 			return;
 		end if;
 	exception when others then
-		raise notice 'loading...';
+		raise notice 'loading pgweaver_cache table ...';
 	end;
 	
-	create temp table dependency_cache as
-	select schema_dependent::text,schema_dependency::text
-	from dependency
-	order by schema_dependent,schema_dependency;
+	create table pgweaver_cache as
+	select g_grantee.rolname::text as schema_dependent, nc.nspname::text as schema_dependency
+	from pg_class c
+	join pg_namespace nc on (c.relnamespace = nc.oid),
+	pg_authid u_grantor, pg_authid g_grantee,
+	(values ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE'), ('REFERENCES'),('TRIGGER')) pr(type)
+	where c.relkind in ('r','v')
+	and g_grantee.rolname not in ('postgres', nc.nspname)
+	and aclcontains(c.relacl, makeaclitem(g_grantee.oid, u_grantor.oid, pr.type, false))
+	and exists(select true from pg_namespace where nspname=g_grantee.rolname)
+	union -- dependency on functions
+	select g_grantee.rolname::text, n.nspname::text
+	from pg_proc p
+	join pg_namespace n on (p.pronamespace = n.oid),
+	pg_authid u_grantor, pg_authid g_grantee
+	where g_grantee.rolname not in ('postgres', n.nspname)
+	and exists(select true from pg_namespace where nspname=g_grantee.rolname)
+	and aclcontains(p.proacl, makeaclitem(g_grantee.oid, u_grantor.oid, 'EXECUTE', false))
+	union -- views dependencies
+	select view_schema::text,table_schema::text
+	from information_schema.view_table_usage
+	where view_schema not like 'pg_%'
+	and view_schema not in ('information_schema', table_schema);
+
+	comment on table pgweaver_cache is 'This table belongs to pgweaver module. pgweaver is available at https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_weaver';
+
 end;
 $$;
 
-
-comment on function cache_dependency(boolean) is
-'Creates a temporary table with all inter-schema dependencies
+comment on function reload_cache(boolean) is
+'Creates a table with all inter-schema dependencies
 Parameters:
-	force_reload - if true, reloads the temporary table even if it already exists.
-';
+	forced - if true, reloads the cache table even if it already exists.
 
-revoke all on function cache_dependency(boolean) from public;
+This function is part of pgweaver module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_weaver';
 
-create or replace function remove_dependents(variadic schemas text[])
+revoke all on function reload_cache(boolean) from public;
+
+create or replace function rm_dependents(variadic schemas text[])
 returns integer
 language plpgsql as
 $$
@@ -91,37 +82,41 @@ begin
 		end if;
 	end loop;
 	
-	perform cache_dependency();
-	select count(1)::int4 into del from dependency_cache where schema_dependent=any(schemas);
-	delete from dependency_cache where schema_dependent=any(schemas);
+	perform reload_cache();
+	select count(1)::int4 into del from pgweaver_cache where schema_dependent=any(schemas);
+	delete from pgweaver_cache where schema_dependent=any(schemas);
 	return del;
 end;
 $$;
 
-comment on function remove_dependents(text[]) is
-'Removes dependent schemas from the temporary table created by "cache_dependency" function.
+comment on function rm_dependents(text[]) is
+'Removes dependent schemas from cache table created by "reload_cache" function.
 Parameters:
 	schemas - array of dependent schemas to remove
 
 Returns:
 	amount of rows deleted
-';
+
+This function is part of pgweaver module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_weaver';
+
+revoke all on function rm_dependents(text[]) from public;
 
 create or replace function schema_degree(schema_name text)
 returns table(dependent_degree int4, dependency_degree int4)
 language plpgsql as
 $$
 begin
-	if schema_name is null or length(schema_name)<=0 then
+	if schema_name is null or length(trim(schema_name))<=0 then
 		raise exception '"schema_name" cannot be empty';
 	end if;
 	
-	perform cache_dependency();
+	perform reload_cache();
 	
 	return query
 	select
-	(select count(1)::int4 from dependency_cache where schema_dependency=schema_name),
-	(select count(1)::int4 from dependency_cache where schema_dependent=schema_name);
+	(select count(1)::int4 from pgweaver_cache where schema_dependency=schema_name),
+	(select count(1)::int4 from pgweaver_cache where schema_dependent=schema_name);
 
 end;
 $$;
@@ -133,20 +128,22 @@ Parameters:
 
 Returns:
 	A row like a vector of <dependent_degree, dependency_degree>
-';
+
+This function is part of pgweaver module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_weaver';
 
 create or replace function leaf_schemas()
 returns setof text
 language plpgsql as
 $$
 begin
-	perform cache_dependency();
+	perform reload_cache();
 
 	return query
 	select distinct a.schema_dependency
-	from dependency_cache a
+	from pgweaver_cache a
 	where not exists(
-		select 1 from dependency_cache
+		select true from pgweaver_cache
 		where schema_dependent=a.schema_dependency
 	)
 	order by a.schema_dependency;
@@ -157,7 +154,9 @@ comment on function leaf_schemas() is
 'Lists all the leaf-schemas in the database. It is analogous to the leaf-vertex of graphs
 Returns:
 	A set of leaf-schemas
-';
+
+This function is part of pgweaver module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_weaver';
 
 create or replace function dependency_graph(schema_name text, depth int2 default 3)
 returns text
@@ -166,7 +165,7 @@ $dgraph$
 declare
 	tgraph text;
 begin
-	if schema_name is null or length(schema_name)<=0 then
+	if schema_name is null or length(trim(schema_name))<=0 then
 		raise exception '"schema_name" cannot be empty';
 	end if;
 	
@@ -174,18 +173,19 @@ begin
 		raise exception '"depth" must be greater than zero';
 	end if;
 
-	perform cache_dependency();
+	perform reload_cache();
 	
-	with recursive trail(schema_dependent,schema_dependency,deep,path,cic) as (
+	with recursive trail(schema_dependent,schema_dependency,deep,path,cic) as
+	(
 		select schema_dependent,schema_dependency,1,array[schema_dependent],false
-		from dependency_cache
+		from pgweaver_cache
 		where schema_dependent=schema_name
 		union all
 		select dc.schema_dependent,dc.schema_dependency,
 		tp.deep+1,path||dc.schema_dependent,
 		dc.schema_dependent=any(path) -- is cyclic?
 		from trail tp
-		join dependency_cache dc on (tp.schema_dependency=dc.schema_dependent)
+		join pgweaver_cache dc on (tp.schema_dependency=dc.schema_dependent)
 		where not cic
 	),
 	deduplicated as (
@@ -214,5 +214,8 @@ Parameters:
 
 Returns:
 	A graph in DOT language when dependency_degree of the given schema is greater than zero. Otherwise, it returns NULL.
-';
 
+This function is part of pgweaver module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_weaver';
+
+revoke all on function dependency_graph(text, int2) from public;
