@@ -4,9 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-09-20
+### Fixed
+- Using the "quote_ident" function in queries that refer to object names.
+
 ## [0.5.1] - 2026-06-14
 ### Fixed
-- the context field in all_casts view, it was showing wrong values.
+- The context field in all_casts view, it was showing wrong values.
 
 ## [0.5.0] - 2026-06-07
 ### Changed

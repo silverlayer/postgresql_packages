@@ -2,7 +2,7 @@
  * Setup for database management module (pgmana)
  * You must run this script with a superuser account.
  * 
- * Authors: Kelvin S. Amorim <developers@silverlayer.space>
+ * Authors: Kelvin S. Amorim <kelvin.amorim@proton.me>
  * Designed for: PostgreSQL 8.4.x
  * Dependencies: plpgsql
  * License: BSD 3-Clause
@@ -117,7 +117,7 @@ https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_
 -- Schema size
 
 create or replace view schema_size(name,size) as
-select s.nspname,sum(pg_total_relation_size(c.oid))
+select quote_ident(s.nspname),sum(pg_total_relation_size(c.oid))
 from pg_class c
 join pg_namespace s on (c.relnamespace=s.oid)
 where c.relkind='r'
@@ -136,7 +136,7 @@ comment on column schema_size.size is 'size of schema (bytes)';
 create or replace view ownership_rectification_stmt(statement)
 as
 -- change table owner
-select 'alter table "'||t.schemaname||'"."'||t.tablename||'" owner to "'||t.schemaname||'";'
+select 'alter table '||quote_ident(t.schemaname)||'.'||quote_ident(t.tablename)||' owner to '||quote_ident(t.schemaname)||';'
 from pg_tables t
 where t.schemaname in (
 	select n.nspname
@@ -146,7 +146,7 @@ where t.schemaname in (
 	and n.nspname not like 'pg_%' and n.nspowner!=a.oid
 )
 union all -- change view owner
-select 'alter view "'||v.schemaname||'"."'||v.viewname||'" owner to "'||v.schemaname||'";'
+select 'alter view '||quote_ident(v.schemaname)||'.'||quote_ident(v.viewname)||' owner to '||quote_ident(v.schemaname)||';'
 from pg_views v
 where v.schemaname in (
 	select n.nspname
@@ -156,7 +156,7 @@ where v.schemaname in (
 	and n.nspname not like 'pg_%' and n.nspowner!=a.oid
 )
 union all -- change sequence owner
-select 'alter sequence "'||n.nspname||'"."'||c.relname||'" owner to "'||n.nspname||'";'
+select 'alter sequence '||quote_ident(n.nspname)||'.'||quote_ident(c.relname)||' owner to '||quote_ident(n.nspname)||';'
 from pg_class c 
 join pg_namespace n on (c.relnamespace=n.oid)
 join pg_authid a on (n.nspname=a.rolname)
@@ -164,14 +164,14 @@ where n.nspname not in ('information_schema','public')
 and n.nspowner!=a.oid and c.relkind='S'
 and n.nspname not like 'pg_%'
 union all -- change function owner
-select 'alter function "'||n.nspname||'"."'||f.proname||'"('||pg_get_function_identity_arguments(f.oid)||') owner to "'||n.nspname||'";'
+select 'alter function '||quote_ident(n.nspname)||'.'||quote_ident(f.proname)||'('||pg_get_function_identity_arguments(f.oid)||') owner to '||quote_ident(n.nspname)||';'
 from pg_proc f
 join pg_namespace n on (f.pronamespace=n.oid)
 join pg_authid a on (n.nspname=a.rolname)
 where n.nspname not in ('information_schema','public')
 and n.nspowner!=a.oid and n.nspname not like 'pg_%'
 union all -- set privilege on tables
-select distinct 'grant select on "'||vt.table_schema||'"."'||vt.table_name||'" to "'||vt.view_schema||'";'
+select distinct 'grant select on '||quote_ident(vt.table_schema)||'.'||quote_ident(vt.table_name)||' to '||quote_ident(vt.view_schema)||';'
 from information_schema.view_table_usage vt
 where vt.view_schema!=vt.table_schema
 and vt.view_schema in (
@@ -182,7 +182,7 @@ and vt.view_schema in (
 	and n.nspname not like 'pg_%' and n.nspowner!=a.oid
 )
 union all -- change schema owner
-select 'alter schema "'||n.nspname||'" owner to "'||n.nspname||'";'
+select 'alter schema '||quote_ident(n.nspname)||' owner to '||quote_ident(n.nspname)||';'
 from pg_namespace n
 join pg_authid a on (n.nspname=a.rolname)
 where n.nspname not in ('information_schema','public')
@@ -196,7 +196,7 @@ https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_
 
 
 create or replace view db_objects("oid","name","type","size","tablespace","tablespace_loc","relfilenode") as
-select c.oid,n.nspname||'.'||c.relname,
+select c.oid,quote_ident(n.nspname)||'.'||quote_ident(c.relname),
 case c.relkind
 	when 'r' then 'table'
 	when 'i' then 'index'
@@ -207,7 +207,7 @@ case c.relkind
 	else 'unknown'
 end,
 pg_relation_size(c.oid),
-ts.spcname,ts.spclocation,c.relfilenode
+quote_ident(ts.spcname),quote_ident(nullif(ts.spclocation,'')),c.relfilenode
 from pg_catalog.pg_class c
 join pg_catalog.pg_namespace n on (c.relnamespace=n.oid)
 join (
@@ -249,7 +249,7 @@ comment on column repeated_indexes.rep_amount is 'amount of repetitions';
 
 
 create or replace view unused_indexes("table_name","index_name","index_size") as
-select schemaname||'.'||relname, indexrelname,pg_relation_size(indexrelid)
+select quote_ident(schemaname)||'.'||quote_ident(relname), quote_ident(indexrelname),pg_relation_size(indexrelid)
 from pg_stat_user_indexes
 join pg_index using (indexrelid)
 where idx_scan<1
@@ -264,7 +264,7 @@ comment on column unused_indexes.index_size is '(in bytes)';
 
 
 create or replace view largeobject_owner("schema","table_oid","table","column") as
-select n.nspname, c.oid, c.relname, a.attname
+select quote_ident(n.nspname), c.oid, quote_ident(c.relname), quote_ident(a.attname)
 from pg_class c
 join pg_attribute a on (a.attrelid=c.oid)
 join pg_namespace n on (n.oid=c.relnamespace)
