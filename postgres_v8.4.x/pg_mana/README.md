@@ -1,4 +1,4 @@
-# Management Module - pgmana v0.5.2
+# Management Module - pgmana v0.6.0
 
 This module's aim is to streamline administrative tasks commonly performed by DBAs in **PostgreSQL v8.4.x**.
 It requires **plpgsql** to work correctly.
@@ -10,12 +10,21 @@ Make sure the **plpgsql** is activated in the target database, and then execute 
 
 ## Functions
 
-`kill_idle(duration interval)` &rarr; `void`
+`kill_idle_txn(duration interval)` &rarr; `void`
 
-Terminates *idle in transaction* backends whose session time is greater than or equal to **duration**. Only superusers can execute it.
+Terminates *idle in transaction* backends whose last query time is greater than or equal to **duration**. Only superusers can execute it.
 
 **Parameters:**
-- duration - threshold for idle session time (default 15 minutes)
+- duration - threshold for idle transaction time (default 1 hour)
+
+&nbsp;
+
+`kill_idle_sess(duration interval)` &rarr; `void`
+
+Terminates idle sessions whose last query time is greater than or equal to **duration**. Only superusers can execute it.
+
+**Parameters:**
+- duration - threshold for idle session time (default 6 hours)
 
 &nbsp;
 
