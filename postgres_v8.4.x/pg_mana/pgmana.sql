@@ -14,7 +14,7 @@ set search_path to public;
 -- FUNCTIONS SECTION
 
 -- Idle sessions
-create or replace function kill_idle(duration interval default '15 minutes')
+create or replace function kill_idle_txn(duration interval default '1 hour')
 returns void
 language plpgsql as
 $$
@@ -27,15 +27,38 @@ begin
 end;
 $$;
 
-comment on function kill_idle(interval) is
-'Terminates "idle in transaction" backends whose session time is greater than or equal to "duration".
+comment on function kill_idle_txn(interval) is
+'Terminates "idle in transaction" backends whose last query time is greater than or equal to "duration".
 Parameters:
-	duration - threshold for idle session time (default 15 minutes)
+	duration - threshold for idle transaction time (default 1 hour)
 
 This function is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
 
-revoke all on function kill_idle(interval) from public;
+revoke all on function kill_idle_txn(interval) from public;
+
+create or replace function kill_idle_sess(duration interval default '6 hours')
+returns void
+language plpgsql as
+$$
+begin
+	perform pg_terminate_backend(procpid)
+	from pg_stat_activity
+	where waiting=false
+	and current_query='<IDLE>'
+	and (clock_timestamp()-query_start) >= duration;
+end;
+$$;
+
+comment on function kill_idle_sess(interval) is
+'Terminates idle sessions whose last query time is greater than or equal to "duration".
+Parameters:
+	duration - threshold for idle session time (default 6 hours)
+
+This function is part of pgmana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
+
+revoke all on function kill_idle_sess(interval) from public;
 
 
 -- Move indexes
@@ -45,11 +68,11 @@ language plpgsql as
 $$
 begin
 	if not exists(select true from pg_tablespace where spcname=dst_tbs) then
-		raise exception 'The specified tablespace "%" does not exist',dst_tbs;
+		raise exception 'The specified tablespace % does not exist',dst_tbs;
 	end if;
 	
 	return query
-	select 'alter index "'||s.nspname||'"."'||c.relname||'" set tablespace "'||dst_tbs||'";'
+	select 'alter index '||quote_ident(s.nspname)||'.'||quote_ident(c.relname)||' set tablespace '||quote_ident(dst_tbs)||';'
 	from pg_class c join pg_namespace s on (c.relnamespace=s.oid)
 	where c.relkind='i' and s.nspname not in ('pg_toast','pg_catalog')
 	and c.reltablespace=0;

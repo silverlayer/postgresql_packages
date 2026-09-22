@@ -8,7 +8,8 @@
 
 set search_path to public;
 
-drop function if exists kill_idle(interval);
+drop function if exists kill_idle_txn(interval);
+drop function if exists kill_idle_sess(interval);
 drop function if exists get_mvidx_stmt(text);
 drop view if exists ownership_rectification_stmt;
 drop view if exists all_casts;
