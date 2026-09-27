@@ -1,4 +1,4 @@
-# Management Module - pgmana v0.6.0
+# Management Module - pgmana v0.7.0
 
 This module's aim is to streamline administrative tasks commonly performed by DBAs in **PostgreSQL v8.4.x**.
 It requires **plpgsql** to work correctly.
@@ -143,3 +143,20 @@ Lists all user-space columns that likely hold a reference to large objects.
 - table_oid - table identification
 - table - table name
 - column - column name
+
+&nbsp;
+
+`role_sequence_grants`
+
+Lists the privileges of the roles for each sequence in the database, if any.
+
+This view is based on native *information_schema.role_table_grants*
+
+**Attributes**
+- grantor - role that grants the privilege
+- grantee - role that the privilege was granted to
+- sequence_catalog - the sequence's database (always the current database)
+- sequence_schema - the sequence's schema
+- sequence_name - name of the sequence
+- privilege_type - type of the privilege: SELECT, UPDATE or USAGE
+- is_grantable - YES if the privilege is grantable, NO if not

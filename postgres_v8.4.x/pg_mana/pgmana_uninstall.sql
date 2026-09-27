@@ -19,3 +19,4 @@ drop view if exists repeated_indexes;
 drop view if exists unused_indexes;
 drop view if exists largeobject_owner;
 drop view if exists all_operators;
+drop view if exists role_sequence_grants;

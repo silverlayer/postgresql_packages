@@ -301,3 +301,25 @@ comment on view largeobject_owner is
 
 This view is part of pgmana module
 https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
+
+create or replace view role_sequence_grants(grantor, grantee, sequence_catalog, sequence_schema, sequence_name, privilege_type, is_grantable) as
+select u_grantor.rolname, g_grantee.rolname, current_database(), nc.nspname, c.relname, pr.type,
+case 
+	when pg_has_role(g_grantee.oid, c.relowner, 'USAGE')
+	or aclcontains(c.relacl, makeaclitem(g_grantee.oid, u_grantor.oid, pr.type, true)) then 'YES'
+	else 'NO'
+end
+from pg_class c, pg_namespace nc, pg_authid u_grantor, pg_authid g_grantee, (values ('SELECT'), ('USAGE'), ('UPDATE')) pr(type)
+where c.relnamespace = nc.oid
+and c.relkind = 'S'
+and aclcontains(c.relacl, makeaclitem(g_grantee.oid, u_grantor.oid, pr.type, false))
+and (
+	u_grantor.rolname in (select enabled_roles.role_name from information_schema.enabled_roles)
+	or g_grantee.rolname in (select enabled_roles.role_name from information_schema.enabled_roles)
+);
+
+comment on view role_sequence_grants is
+'Lists the privileges of the roles for each sequence in the database, if any.
+
+This view is based on "information_schema.role_table_grants" and it belongs to pgmana module
+https://github.com/silverlayer/postgresql_packages/tree/main/postgres_v8.4.x/pg_mana';
